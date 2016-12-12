@@ -14,14 +14,76 @@
 #define TO_MS       512
 
 
+#define IP_ETH_TYPE 0x800
+#define ARP_ETH_TYPE 0x806
+
+#define HI_NIBBLE(b) (((b) >> 4) & 0x0F)
+#define LO_NIBBLE(b) ((b) & 0x0F)
+
 /* DataTypes */
+
+/* Ethernet Packet */
 struct ether_header 
 {
-    u_int8_t ether_dhost[6];
-    u_int8_t ether_shost[6];
-    u_int16_t ether_type;
+    u_int8_t    dhost[6];
+    u_int8_t    shost[6];
+    u_int16_t   eth_type;
 };
 
+typedef struct ether_header ether_header_t;
+
+/* IP Packet */
+struct ip_header{
+
+    u_int8_t    lenver;     //  version(4) + length(4)
+    u_int8_t    tos;        //  type of service
+    u_int16_t   len;        //  lunghezza del datagramma in byte
+    u_int16_t   id;         //  id -> frammentazione
+    u_int16_t   frag;       //  frammentazione(flag(3)+offset(13))
+    u_int8_t    ttl;        //  time-to-live
+    u_int8_t    prot;       //  protocollo di livello superiore
+    u_int16_t   checksum;   //  checksum intestazione
+    
+    /* also possible to use u_int32_t */
+    u_int8_t    source[4];
+    u_int8_t    dest[4];
+
+
+
+
+};
+
+typedef struct ip_header ip_header_t;
+
+
+/* Level 4  HEADER */
+struct udp_header{
+
+    u_int16_t sport;
+    u_int16_t dport;
+    u_int16_t len; //header+dati
+    u_int16_t checksum;
+
+
+};
+
+typedef struct udp_header udp_header_t;
+
+
+struct tcp_header{
+
+    u_int16_t sport;
+    u_int16_t dport;
+    u_int32_t seq;
+    u_int32_t ack;
+    u_int16_t flags;
+    u_int16_t window;
+    u_int16_t checksum;
+    u_int16_t urg;
+
+};
+
+typedef struct tcp_header tcp_header_t;
 
 /* Prototype */
 void do_something_on_packet(u_char*, const struct pcap_pkthdr*,const u_char*);
@@ -73,8 +135,72 @@ int main(int argc,char *argv[]){
 void do_something_on_packet(u_char* arg, const struct pcap_pkthdr* pkthdr,const u_char* packet){
 
 
-    printf("Packet Received\n");
     /* TODO: Parsing Here */
+    
+    u_int16_t          eth_type;
+    ether_header_t     *eptr    = (ether_header_t*)packet;
+    ip_header_t        *ipptr   = NULL; 
+ 
+
+    printf("\n");
+  
+    //timestamp
+    printf("%ld ",pkthdr->ts.tv_sec);
+
+    eth_type = ntohs(eptr->eth_type);
+
+    //MAC_src -> MAC_dest
+    printf("%x:%x:%x:%x:%x:%x -> \%x:%x:%x:%x:%x:%x "
+            ,eptr->shost[0],eptr->shost[1],eptr->shost[2],eptr->shost[3],eptr->shost[4],eptr->dhost[5]
+            ,eptr->dhost[0],eptr->dhost[1],eptr->dhost[2],eptr->dhost[3],eptr->dhost[4],eptr->shost[5]);
+    
+    switch(eth_type){
+   
+        case IP_ETH_TYPE:
+         
+            // IP PACKET
+            ipptr = (ip_header_t*)(packet+14); //14 offset
+          
+            //IP_src -> IP_dest
+            printf("%d.%d.%d.%d -> %d.%d.%d.%d"
+                    ,ipptr->source[0],ipptr->source[1],ipptr->source[2],ipptr->source[3]
+                    ,ipptr->dest[0],ipptr->dest[1],ipptr->dest[2],ipptr->dest[3]);  
+
+            if(ipptr->prot == 6){
+            
+                printf(" TCP");
+                tcp_header_t *tptr = (tcp_header_t*)(packet+14+20);
+                printf(" %d -> %d\n",ntohs(tptr->sport),ntohs(tptr->dport));
+                
+                
+               //TODO Gestire Pacchetto HTTP con URL   
+
+            
+            }else if(ipptr->prot == 17){
+                printf(" UDP");
+                udp_header_t *tptr = (udp_header_t*)(packet+14+20);
+                printf(" %d -> %d\n",ntohs(tptr->sport),ntohs(tptr->dport));
+       
+            }
+
+            
+
+            
+            break;
+
+        case ARP_ETH_TYPE:
+           
+            // ARP PACKET
 
 
+            break;
+
+        default:
+            printf("UNKNOWN PACKET\n");
+            break;
+ 
+
+    }
+
+  
 }
