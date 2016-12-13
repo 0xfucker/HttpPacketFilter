@@ -76,7 +76,8 @@ struct tcp_header{
     u_int16_t dport;
     u_int32_t seq;
     u_int32_t ack;
-    u_int16_t flags;
+    u_int8_t  datares;
+    u_int8_t  flags;
     u_int16_t window;
     u_int16_t checksum;
     u_int16_t urg;
@@ -132,11 +133,51 @@ int main(int argc,char *argv[]){
 
 /* CALLBACK FUNCTION */
 
+void printURL(char *data){
+
+
+    if(!strncmp(data,"GET ",4)){
+        
+        int old = 0;
+        int offset = 4;
+        
+        while(data[offset]!=' ')
+            offset++;
+
+        old = offset;
+        offset += 17;
+        while(data[offset]!='\r') // \r\n
+            offset++;
+
+        printf("URL: ");
+        for(int i=old+17;i<offset;i++)
+            printf("%c",data[i]);
+        for(int i=4;i<old;i++)
+            printf("%c",data[i]);
+        printf("\n");
+
+        
+
+
+
+    }
+
+}
+
 void do_something_on_packet(u_char* arg, const struct pcap_pkthdr* pkthdr,const u_char* packet){
 
 
-    /* TODO: Parsing Here */
+
+  
+
+    if(pkthdr->caplen!=pkthdr->len)
+        return;
+
+    int payload_size = 0;
+    int offset = 0;
     
+
+
     u_int16_t          eth_type;
     ether_header_t     *eptr    = (ether_header_t*)packet;
     ip_header_t        *ipptr   = NULL; 
@@ -153,34 +194,55 @@ void do_something_on_packet(u_char* arg, const struct pcap_pkthdr* pkthdr,const 
     printf("%x:%x:%x:%x:%x:%x -> \%x:%x:%x:%x:%x:%x "
             ,eptr->shost[0],eptr->shost[1],eptr->shost[2],eptr->shost[3],eptr->shost[4],eptr->dhost[5]
             ,eptr->dhost[0],eptr->dhost[1],eptr->dhost[2],eptr->dhost[3],eptr->dhost[4],eptr->shost[5]);
-    
+   
+    offset += 14;
+
     switch(eth_type){
    
         case IP_ETH_TYPE:
          
             // IP PACKET
-            ipptr = (ip_header_t*)(packet+14); //14 offset
-          
+            //
+            ipptr = (ip_header_t*)(packet+offset); //14 offset
             //IP_src -> IP_dest
             printf("%d.%d.%d.%d -> %d.%d.%d.%d"
                     ,ipptr->source[0],ipptr->source[1],ipptr->source[2],ipptr->source[3]
                     ,ipptr->dest[0],ipptr->dest[1],ipptr->dest[2],ipptr->dest[3]);  
 
+           // printf("\nip_header_len: %d\n",LO_NIBBLE(ipptr->lenver));
+              
+            offset += LO_NIBBLE(ipptr->lenver)*4;  
+
             if(ipptr->prot == 6){
             
                 printf(" TCP");
-                tcp_header_t *tptr = (tcp_header_t*)(packet+14+20);
+                tcp_header_t *tptr = (tcp_header_t*)(packet+offset);
                 printf(" %d -> %d\n",ntohs(tptr->sport),ntohs(tptr->dport));
                 
+                offset+=HI_NIBBLE(tptr->datares)*4; 
                 
-               //TODO Gestire Pacchetto HTTP con URL   
+              
+                payload_size = pkthdr->caplen-offset; 
+                if(ntohs(tptr->dport)==80){ 
+                    //TODO Gestire Pacchetto HTTP con URL   
+                    if(payload_size > 0){
+                        char *data =(char*)(packet+offset);
+                        data[payload_size]='\0';  
+                      
+                       
+                        printURL(data);
 
+                    }
             
+                  
+                 
+            
+                }
             }else if(ipptr->prot == 17){
                 printf(" UDP");
                 udp_header_t *tptr = (udp_header_t*)(packet+14+20);
                 printf(" %d -> %d\n",ntohs(tptr->sport),ntohs(tptr->dport));
-       
+                 
             }
 
             
