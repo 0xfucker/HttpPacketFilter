@@ -224,7 +224,7 @@ void do_something_on_packet(u_char* arg, const struct pcap_pkthdr* pkthdr,const 
               
                 payload_size = pkthdr->caplen-offset; 
                 if(ntohs(tptr->dport)==80){ 
-                    //TODO Gestire Pacchetto HTTP con URL   
+                   
                     if(payload_size > 0){
                         char *data =(char*)(packet+offset);
                         data[payload_size]='\0';  
